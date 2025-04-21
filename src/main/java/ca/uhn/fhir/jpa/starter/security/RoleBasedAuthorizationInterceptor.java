@@ -15,6 +15,7 @@ import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor {
@@ -48,7 +49,6 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 
 	@Override
 	public List<IAuthRule> buildRuleList(RequestDetails theRequestDetails) {
-		logger.debug("Building rule list");
 		RuleBuilder builder = new RuleBuilder();
 
 		// 1) Token prüfen
@@ -76,13 +76,14 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 		IGenericClient client = buildGenericClient(theRequestDetails);
 
 		// 2) PractitionerId aus Token holen
-		IIdType practitionerId = ensurePractitioner(username, client);
+		IIdType practitionerId = ensurePractitioner(username, client).toUnqualifiedVersionless();
 		// Store in Request
 		theRequestDetails.getUserData().put("practitionerId", practitionerId);
 
-		// Read/Write own Practitioner (public profile)
-		builder.allow().read().instance(practitionerId).andThen()
-				.allow().write().instance(practitionerId).andThen();
+		logger.debug("Building rule list for {}", practitionerId.getIdPart());
+
+		// Allow creation of Patients:
+		builder.allow().create().resourcesOfType(Patient.class).withAnyId().andThen();
 
 		// allow read of all public practitioners
 		builder.allow().read().resourcesOfType(Practitioner.class).withAnyId().andThen();
@@ -90,76 +91,88 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 		// Use Person for private Profile
 		addPersonRules(builder, practitionerId);
 
-		// Allow creation of Patients:
-		builder.allow().create().resourcesOfType(Patient.class).withAnyId().andThen();
+		ArrayList<IIdType> allowRead = new ArrayList<>();
+		ArrayList<IIdType> allowWrite = new ArrayList<>();
 
 		// 4) Policies nach Rolle
 		PatientLinkedLoader patientLinkedLoader = new PatientLinkedLoader(buildGenericClient(theRequestDetails));
 
 		List<PatientLinkedLoader.PractitionerLink> linkedPatients = patientLinkedLoader.loadPatientIds(practitionerId);
-			if (!linkedPatients.isEmpty()) {
-				List<IIdType> patientIds = linkedPatients.stream().map(PatientLinkedLoader.PractitionerLink::patientId).toList();
-				builder.allow().read().instances(patientIds).andThen();
-				for (PatientLinkedLoader.PractitionerLink link : linkedPatients) {
-					// alle fürfen lesen:
-					IIdType patientId = link.patientId();
-					builder.allow()
-						.read()
-						.allResources()
-						.inCompartment("Patient", patientId)
-						.andThen();
+		if (!linkedPatients.isEmpty()) {
+			List<IIdType> patientIds = linkedPatients.stream().map(PatientLinkedLoader.PractitionerLink::patientId).toList();
 
-					switch (link.linkType()) {
-						case owner:
+			for (PatientLinkedLoader.PractitionerLink link : linkedPatients) {
+				logger.trace("Allow Read to {} for {} as {}", link.patientId().getIdPart(), practitionerId.getIdPart(), link.linkType());
+				// alle fürfen lesen:
+				IIdType patientId = link.patientId();
+				allowRead.add(patientId.toUnqualifiedVersionless());
+				builder.allow()
+					.read()
+					.allResources()
+					.inCompartment("Patient", patientId)
+					.andThen();
 
-							builder.allow().write().instance(patientId).andThen();
-							builder.allow().delete().instance(patientId).andThen();
+				switch (link.linkType()) {
+					case owner:
 
-							// Owner darf alles im Compartment  schreiben
-							builder.allow()
+						logger.debug("Allow Write to Patient {}", patientId);
+						allowWrite.add(patientId.toUnqualifiedVersionless());
+						builder.allow().delete().instance(patientId).andThen();
+
+						// Owner darf alles im Compartment  schreiben
+						builder.allow()
+							.write()
+							.allResources()
+							.inCompartment("Patient", patientId)
+							.andThen()
+							.allow()
+							.create()
+							.allResources()
+							.inCompartment("Patient", patientId)
+							.andThen()
+							.allow()
+							.delete()
+							.allResources()
+							.inCompartment("Patient", patientId)
+							.andThen();
+
+						break;
+
+
+					case vet:
+
+						// ...und bestimmte Resources schreiben
+						ALLOWED_RESOURCES.forEach(aClass -> {
+							builder
+								.allow()
 								.write()
-								.allResources()
+								.resourcesOfType(aClass)
 								.inCompartment("Patient", patientId)
 								.andThen();
-							builder.allow()
-								.create()
-								.allResources()
-								.inCompartment("Patient", patientId)
-								.andThen();
-							// Owner darf alles im Compartment lesen und schreiben
-							builder.allow()
-								.delete()
-								.allResources()
-								.inCompartment("Patient", patientId)
-								.andThen();
+						});
 
-							break;
-
-
-						case vet:
-
-							// ...und bestimmte Resources schreiben
-							ALLOWED_RESOURCES.forEach(aClass -> {
-								builder
-									.allow()
-									.write()
-									.resourcesOfType(aClass)
-									.inCompartment("Patient", patientId)
-									.andThen();
-							});
-
-							break;
-					}
+						break;
 				}
 			}
+		} else {
+			logger.warn("There are no Linked Patients for {}", practitionerId.getIdPart());
+		}
 
+		// Read/Write own Practitioner (public profile)
+		allowRead.add(practitionerId.toUnqualifiedVersionless());
+		allowWrite.add(practitionerId.toUnqualifiedVersionless());
+
+		// Allowing Read and write
+		builder.allow().read().instances(allowRead).andThen();
+		builder.allow().write().instances(allowWrite).andThen();
 
 		// deny everything else:
 		builder.denyAll("deny other ops");
 		// 5) Liste ausgeben
 		List<IAuthRule> finalRuleList = builder.build();
-		finalRuleList.forEach(rule -> logger.trace("Auth rule: {}", rule));
+		finalRuleList.forEach(rule -> logger.info("Auth rule: {}", rule));
 
+		logger.error("FINISHED WITH {} RULES", finalRuleList.size());
 		return finalRuleList;
 	}
 
@@ -174,22 +187,6 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 			.inCompartment("Practitioner", practitionerId)
 			.andThen();
 
-		// 2) Person anlegen (Conditional‑Create) – optional, je nach Use‑Case
-		builder
-			.allow()
-			.createConditional()
-			.resourcesOfType(Person.class)
-			.withTester(new IAuthRuleTester() {
-				@Override
-				public boolean matches(RuleTestRequest theRequest) {
-					if (theRequest.resource instanceof Person person) {
-						return person.hasLink() && person.getLink().stream()
-							.anyMatch(personLinkComponent -> isPractitionerTarget(personLinkComponent.getTarget(), practitionerId));
-					}
-					return false;
-				}
-			})
-			.andThen();
 
 		// 3) Person aktualisieren (Update), aber nur das eigene Profil
 		builder
