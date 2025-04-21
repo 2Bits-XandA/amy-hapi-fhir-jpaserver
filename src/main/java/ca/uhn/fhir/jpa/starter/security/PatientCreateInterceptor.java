@@ -12,10 +12,12 @@ import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.Patient;
 import org.hl7.fhir.r4.model.Reference;
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 
 @Interceptor(order = AuthorizationConstants.ORDER_CONVERTER_INTERCEPTOR)
@@ -25,16 +27,9 @@ public class PatientCreateInterceptor extends InterceptorAdapter {
 	@Override
 	public void incomingRequestPreHandled(RestOperationTypeEnum theOperation, RequestDetails theRequestDetails) {
 		logger.trace("incomingRequestPreHandled running {} for {}", theRequestDetails.getRequestType().name(), theRequestDetails.getResourceName());
-		// 1) Nur POST /Patient
-		process(theRequestDetails);
-	}
-
-	private static void process(RequestDetails theRequestDetails) {
-		if (theRequestDetails.getRequestType().name().equals("POST")
-			&& "Patient".equals(theRequestDetails.getResourceName())) {
-
-			logger.debug("preProcess for PATIENT POST is running");
-			// PractitionerId aus dem Request holen
+		if ("Patient".equals(theRequestDetails.getResourceName()) &&
+			(theRequestDetails.getRequestType().name().equals("POST") || theRequestDetails.getRequestType().name().equals("PUT"))
+		) {
 			IIdType practitionerId = (IIdType) theRequestDetails.getUserData().get("practitionerId");
 			if (practitionerId == null) {
 				logger.error("No practitioner ID found in request context");
@@ -47,14 +42,43 @@ public class PatientCreateInterceptor extends InterceptorAdapter {
 				throw new InvalidRequestException("Must be a Patient Resource");
 			}
 
-			// Enforce GeneralPractitioner
-			List<Reference> list = new ArrayList<>();
-			Reference reference = new Reference(practitionerId.toUnqualifiedVersionless());
-			reference.addExtension(LinkType.owner.toExtension());
-			list.add(reference);
-			p.setGeneralPractitioner(list);
-
-
+			if (theRequestDetails.getRequestType().name().equals("POST")) {
+				// 1) Nur POST /Patient
+				onCreate(p, practitionerId);
+			} else {
+				onUpdate(p, practitionerId);
+			}
 		}
+	}
+
+	private static void onCreate(Patient p, IIdType practitionerId) {
+		logger.debug("preProcess for PATIENT POST is running");
+		// PractitionerId aus dem Request holen
+
+		// Enforce GeneralPractitioner
+		List<Reference> list = new ArrayList<>();
+		Reference reference = buildOwner(practitionerId);
+		list.add(reference);
+		p.setGeneralPractitioner(list);
+
+		logger.info("Creating Patient with {} Practitioners", list.size());
+	}
+
+	private static void onUpdate(Patient p, IIdType practitionerId) {
+		logger.debug("preProcess for PATIENT {} PUT is running", p.getId());
+
+		LinkedList<Reference> list = new LinkedList<>(
+			p.getGeneralPractitioner().stream().filter(reference -> !PatientLinkedLoader.isReferenceForId(reference, practitionerId.toUnqualifiedVersionless())).toList()
+		);
+		list.addFirst(buildOwner(practitionerId));
+		p.setGeneralPractitioner(list);
+
+		logger.info("UPDATE Patient {} with {} Practitioners", p.getIdElement().getId(), list.size());
+	}
+
+	private static @NotNull Reference buildOwner(IIdType practitionerId) {
+		Reference reference = new Reference(practitionerId.toUnqualifiedVersionless());
+		reference.addExtension(LinkType.owner.toExtension());
+		return reference;
 	}
 }
