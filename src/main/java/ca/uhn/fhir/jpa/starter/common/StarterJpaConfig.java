@@ -48,6 +48,7 @@ import ca.uhn.fhir.jpa.starter.annotations.OnCorsPresent;
 import ca.uhn.fhir.jpa.starter.annotations.OnImplementationGuidesPresent;
 import ca.uhn.fhir.jpa.starter.common.validation.IRepositoryValidationInterceptorFactory;
 import ca.uhn.fhir.jpa.starter.ig.IImplementationGuideOperationProvider;
+import ca.uhn.fhir.jpa.starter.security.PatientCreateInterceptor;
 import ca.uhn.fhir.jpa.starter.security.RoleBasedAuthorizationInterceptor;
 import ca.uhn.fhir.jpa.starter.util.EnvironmentHelper;
 import ca.uhn.fhir.jpa.subscription.util.SubscriptionDebugLogInterceptor;
@@ -479,6 +480,8 @@ public class StarterJpaConfig {
 		}
 
 		fhirServer.registerInterceptor(roleBasedAuthorizationInterceptor);
+
+		fhirServer.registerInterceptor(new PatientCreateInterceptor());
 
 		// register custom providers
 		registerCustomProviders(fhirServer, appContext, appProperties.getCustomProviderClasses());
