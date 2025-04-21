@@ -15,14 +15,30 @@ import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
 public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor {
 	private static final Logger logger = LoggerFactory.getLogger(RoleBasedAuthorizationInterceptor.class);
-	private static final List<Class<? extends IBaseResource>> ALLOWED_RESOURCES = List.of(Observation.class, MedicationRequest.class);
+	private static final List<Class<? extends IBaseResource>> ALLOWED_RESOURCES = List.of(
+		Observation.class, MedicationRequest.class, MedicationAdministration.class,
+		DocumentReference.class, Immunization.class, Condition.class, Encounter.class
+	);
 	public static final String IDENTIFIER_USERNAME = "http://amyvet.org/fhir/identifier/username";
+	private static final MessageDigest messageDigest = getMessageDigest();
+
+	private static MessageDigest getMessageDigest()  {
+		try {
+			return MessageDigest.getInstance("SHA-256");
+		} catch (NoSuchAlgorithmException e) {
+			logger.error("SHA-256 must exist! Aborting");
+			System.exit(2);
+			throw new RuntimeException("SHA-256 must exist");
+		}
+	}
 
 
 	private final FhirContext myFhirContext;
@@ -174,6 +190,7 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 
 		// HAPI BUG: Allow.Write and allow.create will use the same list - we need both
 		// Workaround: create a second Builder and add Write - then combine both
+		logger.info("Allow write for instances: {}", allowWrite);
 		secondWriteBuilder.allow().write().instances(allowWrite).andThen();
 		// deny everything else:
 		secondWriteBuilder.denyAll("deny other ops");
@@ -243,7 +260,8 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 	}
 
 	private IIdType createOrFetchPractitionerId(String username, IGenericClient client) {
-		logger.info("Creating or fetching practitioner ID for username: {}", username);
+		String nameHash = userNameHash(username);
+		logger.info("Creating or fetching practitioner ID for username: {} with hash {}", username, nameHash);
 
 		// wie oben: build Practitioner mit Identifier = username
 		Practitioner p = buildPractitionerForUser(username);
@@ -254,7 +272,7 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 			.conditional()
 			.where(
 				Practitioner.IDENTIFIER.exactly()
-					.systemAndCode(IDENTIFIER_USERNAME, username)
+					.systemAndCode(IDENTIFIER_USERNAME, nameHash)
 			)
 			.cacheControl(CacheControlDirective.noCache())
 			.execute();
@@ -262,11 +280,15 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 		return outcome.getId();
 	}
 
+	private static String userNameHash(String username) {
+		return java.util.Base64.getEncoder().encodeToString(messageDigest.digest(username.toLowerCase().getBytes()));
+	}
+
 	private Practitioner buildPractitionerForUser(String username) {
 		return new Practitioner()
 			.addIdentifier(new Identifier()
 				.setSystem(IDENTIFIER_USERNAME)
-				.setValue(username))
+				.setValue(userNameHash(username)))
 			.setActive(true);
 	}
 
