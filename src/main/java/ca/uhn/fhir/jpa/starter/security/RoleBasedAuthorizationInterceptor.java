@@ -59,9 +59,6 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 		logger.warn("Building rule list");
 		RuleBuilder builder = new RuleBuilder();
 
-		// addDefaultRulesToBuilder(builder);
-
-
 		// 1) Token prüfen
 		String jwt = extractToken(theRequestDetails);
 		if (jwt == null) {
@@ -84,38 +81,45 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 			return builder.build();
 		}
 
-		// 2) PractitionerId aus Token holen
-		IIdType practitionerId = ensurePractitioner(username, theRequestDetails);
+		IGenericClient client = buildGenericClient(theRequestDetails);
 
+		// 2) PractitionerId aus Token holen
+		IIdType practitionerId = ensurePractitioner(username, client);
+
+		// Read/Write own Practitioner (public profile)
+		builder.allow().read().instance(practitionerId).andThen()
+				.allow().write().instance(practitionerId).andThen();
+
+		// allow read of all public practitioners
+		builder.allow().read().resourcesOfType(Practitioner.class).withAnyId().andThen();
+
+		// Use Person for private Profile
 		addPersonRules(builder, practitionerId);
 
-		builder.allow().create().resourcesOfType(PractitionerRole.class).inCompartment("Practitioner", practitionerId);
-		builder.allow().read().resourcesOfType(PractitionerRole.class).inCompartment("Practitioner", practitionerId);
+		// Allow creation of Patients:
 		builder.allow().create().resourcesOfType(Patient.class).withAnyId().andThen();
 
-		// 3) PractitionerRole laden und Period prüfen
-		List<PractitionerRole> roles = lookupPractitionerRoles(practitionerId, theRequestDetails);
-
-
 		// 4) Policies nach Rolle
-		for (PractitionerRole role : roles) {
-			List<IIdType> patientIds = loadPatientIds(role, theRequestDetails);
-			if (!patientIds.isEmpty()) {
-				String code = role.getCodeFirstRep().getCodingFirstRep().getCode();
+		PatientLinkedLoader patientLinkedLoader = new PatientLinkedLoader(buildGenericClient(theRequestDetails));
+
+		List<PatientLinkedLoader.PractitionerLink> linkedPatients = patientLinkedLoader.loadPatientIds(practitionerId);
+			if (!linkedPatients.isEmpty()) {
+				List<IIdType> patientIds = linkedPatients.stream().map(PatientLinkedLoader.PractitionerLink::patientId).toList();
 				builder.allow().read().instances(patientIds).andThen();
-				for (IIdType patientId : patientIds) {
+				for (PatientLinkedLoader.PractitionerLink link : linkedPatients) {
 					// alle fürfen lesen:
+					IIdType patientId = link.patientId();
 					builder.allow()
 						.read()
 						.allResources()
 						.inCompartment("Patient", patientId)
 						.andThen();
 
-					switch (code) {
-						case "owner":
+					switch (link.linkType()) {
+						case owner:
 
-							builder.allow().write().instances(patientIds).andThen();
-							builder.allow().delete().instances(patientIds).andThen();
+							builder.allow().write().instance(patientId).andThen();
+							builder.allow().delete().instance(patientId).andThen();
 
 							// Owner darf alles im Compartment  schreiben
 							builder.allow()
@@ -138,7 +142,7 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 							break;
 
 
-						case "vet":
+						case vet:
 
 							// ...und bestimmte Resources schreiben
 							ALLOWED_RESOURCES.forEach(aClass -> {
@@ -154,43 +158,17 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 					}
 				}
 			}
-		}
+
 
 		// deny everything else:
 		builder.denyAll("deny other ops");
 		// 5) Liste ausgeben
-		return builder.build();
+		List<IAuthRule> finalRuleList = builder.build();
+		finalRuleList.forEach(rule -> logger.info("Auth rule: {}", rule));
+
+		return finalRuleList;
 	}
 
-	private List<IIdType> loadPatientIds(PractitionerRole role, RequestDetails theRequestDetails) {
-		logger.info("Loading patient IDs for practitioner role: {}", role.getId());
-		IGenericClient client = buildGenericClient(theRequestDetails);
-		Bundle result = client
-			.search()
-			.forResource(Patient.class)
-			.where(Patient.GENERAL_PRACTITIONER.hasId(role.getIdElement().getIdPart()))
-			.elementsSubset(Patient.SP_RES_ID)
-			.cacheControl(CacheControlDirective.noCache())
-			.returnBundle(Bundle.class)
-			.execute();
-
-		List<IIdType> patientIds = new ArrayList<>();
-		Bundle nextBundle = result;
-		do {
-			nextBundle.getEntry().stream()
-				.map(entry -> entry.getResource().getIdElement())
-				.forEach(patientIds::add);
-
-			if (nextBundle.getLink(Bundle.LINK_NEXT) != null) {
-				nextBundle = client.loadPage().next(nextBundle).execute();
-			} else {
-				nextBundle = null;
-			}
-		} while (nextBundle != null);
-
-		logger.info("Using {} Patients for {} ", patientIds.size(), role.getId());
-		return patientIds;
-	}
 
 	private void addPersonRules(RuleBuilder builder, IIdType practitionerId) {
 		logger.info("Adding person rules for practitioner ID: {}", practitionerId);
@@ -236,22 +214,8 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 		return expectedReference.equals(target.getReference());
 	}
 
-	private static void addDefaultRulesToBuilder(RuleBuilder builder) {
-		// ERLAUBE intern: Practitioner‑Create & Practitioner/PractitionerRole‑Read
-		builder
-			.allow()
-			.create()
-			.resourcesOfType(Practitioner.class)
-			.withCodeInValueSet("identifier", IDENTIFIER_USERNAME)
-			.andThen()
-			.allow()
-			.read()
-			.resourcesOfType(Practitioner.class).withCodeInValueSet("identifier", IDENTIFIER_USERNAME)
-			.andThen();
-	}
-
-	public IIdType ensurePractitioner(String username, RequestDetails req) {
-		return practitionerCache.get(username, u -> createOrFetchPractitionerId(u, req));
+	public IIdType ensurePractitioner(String username, IGenericClient client) {
+		return practitionerCache.get(username, u -> createOrFetchPractitionerId(u, client));
 	}
 
 	private String extractUsernameFromJwt(RequestDetails req) {
@@ -259,8 +223,8 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 		if (token == null) {
 			return null;
 		}
-		if (token.equals("DEBUG")) {
-			return "DEBUG-USER";
+		if (token.startsWith("DEBUG")) {
+			return "DEBUG-USER" + token.substring(5);
 		}
 		String[] parts = token.split("\\.");
 		if (parts.length != 3) {
@@ -276,9 +240,8 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 		}
 	}
 
-	private IIdType createOrFetchPractitionerId(String username, RequestDetails theRequestDetails) {
+	private IIdType createOrFetchPractitionerId(String username, IGenericClient client) {
 		logger.info("Creating or fetching practitioner ID for username: {}", username);
-		IGenericClient client = buildGenericClient(theRequestDetails);
 
 		// wie oben: build Practitioner mit Identifier = username
 		Practitioner p = buildPractitionerForUser(username);
@@ -313,51 +276,6 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 		return client;
 	}
 
-
-	private List<PractitionerRole> lookupPractitionerRoles(IIdType practitionerId, RequestDetails theRequestDetails) {
-		logger.info("Looking up practitioner roles for practitioner ID: {}", practitionerId.toUnqualifiedVersionless());
-		IGenericClient client = buildGenericClient(theRequestDetails);
-		Bundle result = client
-			.search()
-			.forResource(PractitionerRole.class)
-			.where(PractitionerRole.PRACTITIONER.hasId(practitionerId.getIdPart()))
-			.cacheControl(CacheControlDirective.noCache())
-			.returnBundle(Bundle.class)
-			.execute();
-
-		List<PractitionerRole> roles = new ArrayList<>();
-		Bundle nextBundle = result;
-		do {
-			nextBundle.getEntry().stream()
-				.map(entry -> (PractitionerRole) entry.getResource())
-				.filter(this::isWithinPeriod)
-				.forEach(roles::add);
-			if (nextBundle.getLink(Bundle.LINK_NEXT) != null) {
-				nextBundle = client.loadPage().next(nextBundle).execute();
-			} else {
-				nextBundle = null;
-			}
-		} while (nextBundle != null);
-		logger.info("Roles for Practitioner ID {} are {} ",
-			practitionerId,
-			roles.stream().map(Resource::getId).collect(Collectors.joining())
-		);
-		return roles;
-	}
-
-	private boolean isWithinPeriod(PractitionerRole role) {
-		Period period = role.getPeriod();
-		if (period == null) {
-			logger.info("Role {} has no Period", role.getId());
-			return true;
-		}
-		Instant now = Instant.now();
-		boolean withinValidPeriod = (period.getStart() == null || now.isAfter(period.getStart().toInstant())) &&
-			(period.getEnd() == null || now.isBefore(period.getEnd().toInstant()));
-		logger.info("Period is over for {}", role.getId());
-		return withinValidPeriod;
-	}
-
 	private String extractToken(RequestDetails request) {
 		String auth = request.getHeader("Authorization");
 		if (auth != null && auth.startsWith("Bearer ")) {
@@ -366,4 +284,3 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 		return null;
 	}
 }
-
