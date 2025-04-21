@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor {
 	private static final Logger logger = LoggerFactory.getLogger(RoleBasedAuthorizationInterceptor.class);
@@ -49,7 +50,8 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 
 	@Override
 	public List<IAuthRule> buildRuleList(RequestDetails theRequestDetails) {
-		RuleBuilder builder = new RuleBuilder();
+		final RuleBuilder builder = new RuleBuilder();
+		final RuleBuilder secondWriteBuilder = new RuleBuilder();
 
 		// 1) Token prüfen
 		String jwt = extractToken(theRequestDetails);
@@ -83,13 +85,14 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 		logger.debug("Building rule list for {}", practitionerId.getIdPart());
 
 		// Allow creation of Patients:
+		// Allow create must be first!
 		builder.allow().create().resourcesOfType(Patient.class).withAnyId().andThen();
 
 		// allow read of all public practitioners
 		builder.allow().read().resourcesOfType(Practitioner.class).withAnyId().andThen();
 
 		// Use Person for private Profile
-		addPersonRules(builder, practitionerId);
+		addPersonRules(builder, secondWriteBuilder, practitionerId);
 
 		ArrayList<IIdType> allowRead = new ArrayList<>();
 		ArrayList<IIdType> allowWrite = new ArrayList<>();
@@ -120,11 +123,13 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 						builder.allow().delete().instance(patientId).andThen();
 
 						// Owner darf alles im Compartment  schreiben
-						builder.allow()
+						secondWriteBuilder
+							.allow()
 							.write()
 							.allResources()
 							.inCompartment("Patient", patientId)
-							.andThen()
+							.andThen();
+						builder
 							.allow()
 							.create()
 							.allResources()
@@ -143,7 +148,7 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 
 						// ...und bestimmte Resources schreiben
 						ALLOWED_RESOURCES.forEach(aClass -> {
-							builder
+							secondWriteBuilder
 								.allow()
 								.write()
 								.resourcesOfType(aClass)
@@ -164,12 +169,18 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 
 		// Allowing Read and write
 		builder.allow().read().instances(allowRead).andThen();
-		builder.allow().write().instances(allowWrite).andThen();
 
+		List<IAuthRule> firstList = builder.build();
+
+		// HAPI BUG: Allow.Write and allow.create will use the same list - we need both
+		// Workaround: create a second Builder and add Write - then combine both
+		secondWriteBuilder.allow().write().instances(allowWrite).andThen();
 		// deny everything else:
-		builder.denyAll("deny other ops");
+		secondWriteBuilder.denyAll("deny other ops");
 		// 5) Liste ausgeben
-		List<IAuthRule> finalRuleList = builder.build();
+		List<IAuthRule> secondList = secondWriteBuilder.build();
+
+		List<IAuthRule> finalRuleList = Stream.concat(firstList.stream(), secondList.stream()).toList();
 		finalRuleList.forEach(rule -> logger.info("Auth rule: {}", rule));
 
 		logger.error("FINISHED WITH {} RULES", finalRuleList.size());
@@ -177,10 +188,10 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 	}
 
 
-	private void addPersonRules(RuleBuilder builder, IIdType practitionerId) {
+	private void addPersonRules(RuleBuilder createBuilder,RuleBuilder writeBuilder, IIdType practitionerId) {
 		logger.debug("Adding person rules for practitioner ID: {}", practitionerId);
 		// 1) Person lesen (nur wenn link=Practitioner/{id})
-		builder
+		createBuilder
 			.allow()
 			.read()
 			.resourcesOfType(Person.class)
@@ -189,7 +200,7 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 
 
 		// 3) Person aktualisieren (Update), aber nur das eigene Profil
-		builder
+		writeBuilder
 			.allow()
 			.write()
 			.resourcesOfType(Person.class)
