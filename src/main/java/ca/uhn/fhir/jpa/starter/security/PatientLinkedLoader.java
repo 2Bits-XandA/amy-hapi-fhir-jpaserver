@@ -23,12 +23,12 @@ public class PatientLinkedLoader {
 	public static boolean isReferenceForId(Reference ref, IIdType id) {
 		boolean isMatch =  ref.getReferenceElement().getResourceType().equals(id.getResourceType()) &&
 			ref.getReferenceElement().getIdPart()       .equals(id.getIdPart());
-		PatientLinkedLoader.logger.info("Reference {} and ID {} are {}", ref.getReference(),id.getValue(), isMatch);
+		logger.trace("Reference {} and ID {} are {}", ref.getReference(),id.getValue(), isMatch);
 		return isMatch;
 	}
 
 	public List<PractitionerLink> loadPatientIds(IIdType practId) {
-		logger.info("Loading patient IDs for practitioner role: {}",practId);
+		logger.trace("Loading patient IDs for practitioner role: {}",practId);
 		Bundle result = client
 			.search()
 			.forResource(Patient.class)
@@ -58,7 +58,7 @@ public class PatientLinkedLoader {
 			}
 		} while (nextBundle != null);
 
-		logger.info("Using {} Patients for {} ", patientIds.size(), practId.getIdPart());
+		logger.debug("Using {} Patients for {} ", patientIds.size(), practId.getIdPart());
 		return patientIds;
 	}
 
@@ -117,7 +117,7 @@ public class PatientLinkedLoader {
 			Instant now = Instant.now();
 			boolean withinValidPeriod = (period.getStart() == null || now.isAfter(period.getStart().toInstant())) &&
 				(period.getEnd() == null || now.isBefore(period.getEnd().toInstant()));
-			logger.info("Period is over for {}", role.getId());
+			logger.debug("Period is over for {}", role.getId());
 			return withinValidPeriod;
 		}
 		return false;

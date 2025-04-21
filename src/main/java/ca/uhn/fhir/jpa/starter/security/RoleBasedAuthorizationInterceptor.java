@@ -1,14 +1,12 @@
 package ca.uhn.fhir.jpa.starter.security;
 
 import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.rest.api.CacheControlDirective;
 import ca.uhn.fhir.rest.api.MethodOutcome;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
-import ca.uhn.fhir.rest.server.interceptor.auth.AuthorizationInterceptor;
-import ca.uhn.fhir.rest.server.interceptor.auth.IAuthRule;
-import ca.uhn.fhir.rest.server.interceptor.auth.IAuthRuleTester;
-import ca.uhn.fhir.rest.server.interceptor.auth.RuleBuilder;
+import ca.uhn.fhir.rest.server.interceptor.auth.*;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.hl7.fhir.instance.model.api.IBaseResource;
@@ -18,10 +16,7 @@ import org.hl7.fhir.r4.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor {
 	private static final Logger logger = LoggerFactory.getLogger(RoleBasedAuthorizationInterceptor.class);
@@ -56,7 +51,7 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 
 	@Override
 	public List<IAuthRule> buildRuleList(RequestDetails theRequestDetails) {
-		logger.warn("Building rule list");
+		logger.debug("Building rule list");
 		RuleBuilder builder = new RuleBuilder();
 
 		// 1) Token prüfen
@@ -68,11 +63,11 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 		}
 
 		if (isInternalToken(jwt)) {
-			logger.info("Request authorized using internal token");
+			logger.debug("Request authorized using internal token");
 			builder.allowAll(); // TODO: Reduce the Rights here!
 			return builder.build();
 		}
-		logger.info("Using Token {}", jwt);
+		logger.trace("Using Token {}", jwt);
 
 		String username = extractUsernameFromJwt(theRequestDetails);
 		if (username == null || username.isBlank()) {
@@ -85,6 +80,8 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 
 		// 2) PractitionerId aus Token holen
 		IIdType practitionerId = ensurePractitioner(username, client);
+		// Store in Request
+		theRequestDetails.getUserData().put("practitionerId", practitionerId);
 
 		// Read/Write own Practitioner (public profile)
 		builder.allow().read().instance(practitionerId).andThen()
@@ -164,14 +161,14 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 		builder.denyAll("deny other ops");
 		// 5) Liste ausgeben
 		List<IAuthRule> finalRuleList = builder.build();
-		finalRuleList.forEach(rule -> logger.info("Auth rule: {}", rule));
+		finalRuleList.forEach(rule -> logger.trace("Auth rule: {}", rule));
 
 		return finalRuleList;
 	}
 
 
 	private void addPersonRules(RuleBuilder builder, IIdType practitionerId) {
-		logger.info("Adding person rules for practitioner ID: {}", practitionerId);
+		logger.debug("Adding person rules for practitioner ID: {}", practitionerId);
 		// 1) Person lesen (nur wenn link=Practitioner/{id})
 		builder
 			.allow()
