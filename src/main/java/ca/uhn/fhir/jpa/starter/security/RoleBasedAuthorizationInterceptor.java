@@ -1,7 +1,6 @@
 package ca.uhn.fhir.jpa.starter.security;
 
 import ca.uhn.fhir.context.FhirContext;
-import ca.uhn.fhir.interceptor.api.Interceptor;
 import ca.uhn.fhir.rest.api.CacheControlDirective;
 import ca.uhn.fhir.rest.api.MethodOutcome;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
@@ -21,12 +20,12 @@ import java.util.List;
 public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor {
 	private static final Logger logger = LoggerFactory.getLogger(RoleBasedAuthorizationInterceptor.class);
 	private static final List<Class<? extends IBaseResource>> ALLOWED_RESOURCES = List.of(Observation.class, MedicationRequest.class);
-	public static final String IDENTIFIER_USERNAME = "http://example.org/fhir/identifier/username";
+	public static final String IDENTIFIER_USERNAME = "http://amyvet.org/fhir/identifier/username";
 
 
 	private final FhirContext myFhirContext;
 
-	private final String internalAuthToken = java.util.UUID.randomUUID().toString();
+	private final RollingAccessToken internalAuthToken = new RollingAccessToken();
 
 	private final Cache<String, IIdType> practitionerCache = Caffeine.newBuilder()
 		.expireAfterWrite(java.time.Duration.ofMinutes(15))
@@ -39,14 +38,12 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 		myFhirContext = fhirContext;
 	}
 
-	// TODO: internalToken should change over time - faster then brute force is possible
-	// last used code should be accepted as well.
 	public boolean isInternalToken(String token) {
-		return internalAuthToken.equals(token);
+		return internalAuthToken.isInternalToken(token);
 	}
 
 	public String currentInternalToken() {
-		return internalAuthToken;
+		return internalAuthToken.currentInternalToken();
 	}
 
 	@Override
