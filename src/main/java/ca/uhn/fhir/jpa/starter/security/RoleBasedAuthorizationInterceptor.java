@@ -116,6 +116,9 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 		// 4) Policies nach Rolle
 		PatientLinkedLoader patientLinkedLoader = new PatientLinkedLoader(buildGenericClient(theRequestDetails));
 
+		// Allow to read all Patients in Practitioner compartment
+		builder.allow().read().resourcesOfType(Patient.class).inCompartment("Practitioner", practitionerId).andThen();
+
 		List<PatientLinkedLoader.PractitionerLink> linkedPatients = patientLinkedLoader.loadPatientIds(practitionerId);
 		if (!linkedPatients.isEmpty()) {
 			List<IIdType> patientIds = linkedPatients.stream().map(PatientLinkedLoader.PractitionerLink::patientId).toList();
