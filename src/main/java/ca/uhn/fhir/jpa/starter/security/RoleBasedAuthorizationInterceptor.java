@@ -1,10 +1,16 @@
 package ca.uhn.fhir.jpa.starter.security;
 
 import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.i18n.Msg;
+import ca.uhn.fhir.interceptor.api.Hook;
+import ca.uhn.fhir.interceptor.api.Pointcut;
+import ca.uhn.fhir.jpa.starter.security.jwks.JwtPayload;
+import ca.uhn.fhir.jpa.starter.security.jwks.JwtValidator;
 import ca.uhn.fhir.rest.api.CacheControlDirective;
 import ca.uhn.fhir.rest.api.MethodOutcome;
 import ca.uhn.fhir.rest.api.server.RequestDetails;
 import ca.uhn.fhir.rest.client.api.IGenericClient;
+import ca.uhn.fhir.rest.server.exceptions.AuthenticationException;
 import ca.uhn.fhir.rest.server.interceptor.auth.*;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -20,6 +26,8 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor {
 	private static final Logger logger = LoggerFactory.getLogger(RoleBasedAuthorizationInterceptor.class);
@@ -40,6 +48,7 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 		}
 	}
 
+	private final JwtValidator jwtValidator;
 
 	private final FhirContext myFhirContext;
 
@@ -51,7 +60,8 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 		.build();
 
 
-	public RoleBasedAuthorizationInterceptor(FhirContext fhirContext) {
+	public RoleBasedAuthorizationInterceptor(JwtValidator jwtValidator, FhirContext fhirContext) {
+		this.jwtValidator = jwtValidator;
 		logger.warn("Init Role Based Auth {}", currentInternalToken());
 		myFhirContext = fhirContext;
 	}
@@ -64,6 +74,20 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 		return internalAuthToken.currentInternalToken();
 	}
 
+	@Hook(Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED)
+	public boolean incomingRequestPostProcessed(RequestDetails theRequestDetails, HttpServletRequest theRequest, HttpServletResponse theResponse) throws AuthenticationException {
+		String authHeader = theRequestDetails.getHeader("Authorization");
+
+
+		// The format of the header must be:
+		// Authorization: Bearer [jwt-Token]
+		if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+			throw new AuthenticationException(Msg.code(642) + "Missing or invalid Authorization header");
+		}
+
+		return true;
+	}
+
 	@Override
 	public List<IAuthRule> buildRuleList(RequestDetails theRequestDetails) {
 		final RuleBuilder builder = new RuleBuilder();
@@ -73,8 +97,9 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 		String jwt = extractToken(theRequestDetails);
 		if (jwt == null) {
 			logger.warn("Request denied - no token provided");
-			builder.denyAll("Kein Token");
-			return builder.build();
+			throw new AuthenticationException(Msg.code(644) + "Missing or invalid Authorization header value");
+			// builder.denyAll("Kein Token");
+			// return builder.build();
 		}
 
 		if (isInternalToken(jwt)) {
@@ -84,7 +109,15 @@ public class RoleBasedAuthorizationInterceptor extends AuthorizationInterceptor 
 		}
 		logger.trace("Using Token {}", jwt);
 
-		String username = extractUsernameFromJwt(theRequestDetails);
+		// TODO: Check JWT Token
+		final JwtPayload token;
+		try {
+			token = jwtValidator.parseAndValidate(jwt);
+		} catch (Exception e) {
+			throw new AuthenticationException(Msg.code(644) + "Missing or invalid Authorization header value", e);
+		}
+
+		String username = token.getPreferred_username(); // extractUsernameFromJwt(theRequestDetails);
 		if (username == null || username.isBlank()) {
 			logger.warn("Request denied - no username found in token");
 			builder.denyAll("Kein Username");
