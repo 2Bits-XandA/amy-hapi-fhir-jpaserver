@@ -169,4 +169,7 @@ Temporary Items
 # Helm Chart dependencies
 **/charts/*.tgz
 /keycloak/postgres-data
-.claude
+# Claude Code
+.claude/
+!.claude/settings.json
+!.claude/launch.json
