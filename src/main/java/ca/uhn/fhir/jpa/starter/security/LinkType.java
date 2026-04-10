@@ -25,9 +25,11 @@ public enum LinkType {
 	}
 
 	public static boolean isValidExtension(Extension extension) {
-		return extension != null &&
-			EXTENSION_URL.equals(extension.getUrl()) &&
-			extension.getValue() instanceof StringType &&
-			Stream.of(LinkType.values()).map(Enum::name).anyMatch(n -> n.equals(((StringType) extension.getValue()).getValue()));
+		return extension != null
+				&& EXTENSION_URL.equals(extension.getUrl())
+				&& extension.getValue() instanceof StringType
+				&& Stream.of(LinkType.values())
+						.map(Enum::name)
+						.anyMatch(n -> n.equals(((StringType) extension.getValue()).getValue()));
 	}
 }

@@ -7,7 +7,6 @@ import ca.uhn.fhir.rest.server.exceptions.AuthenticationException;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import ca.uhn.fhir.rest.server.interceptor.InterceptorAdapter;
 import ca.uhn.fhir.rest.server.interceptor.auth.AuthorizationConstants;
-
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.instance.model.api.IIdType;
 import org.hl7.fhir.r4.model.Patient;
@@ -26,10 +25,13 @@ public class PatientCreateInterceptor extends InterceptorAdapter {
 
 	@Override
 	public void incomingRequestPreHandled(RestOperationTypeEnum theOperation, RequestDetails theRequestDetails) {
-		logger.trace("incomingRequestPreHandled running {} for {}", theRequestDetails.getRequestType().name(), theRequestDetails.getResourceName());
-		if ("Patient".equals(theRequestDetails.getResourceName()) &&
-			(theRequestDetails.getRequestType().name().equals("POST") || theRequestDetails.getRequestType().name().equals("PUT"))
-		) {
+		logger.trace(
+				"incomingRequestPreHandled running {} for {}",
+				theRequestDetails.getRequestType().name(),
+				theRequestDetails.getResourceName());
+		if ("Patient".equals(theRequestDetails.getResourceName())
+				&& (theRequestDetails.getRequestType().name().equals("POST")
+						|| theRequestDetails.getRequestType().name().equals("PUT"))) {
 			IIdType practitionerId = (IIdType) theRequestDetails.getUserData().get("practitionerId");
 			if (practitionerId == null) {
 				logger.error("No practitioner ID found in request context");
@@ -67,9 +69,10 @@ public class PatientCreateInterceptor extends InterceptorAdapter {
 	private static void onUpdate(Patient p, IIdType practitionerId) {
 		logger.debug("preProcess for PATIENT {} PUT is running", p.getId());
 
-		LinkedList<Reference> list = new LinkedList<>(
-			p.getGeneralPractitioner().stream().filter(reference -> !PatientLinkedLoader.isReferenceForId(reference, practitionerId.toUnqualifiedVersionless())).toList()
-		);
+		LinkedList<Reference> list = new LinkedList<>(p.getGeneralPractitioner().stream()
+				.filter(reference ->
+						!PatientLinkedLoader.isReferenceForId(reference, practitionerId.toUnqualifiedVersionless()))
+				.toList());
 		list.addFirst(buildOwner(practitionerId));
 		p.setGeneralPractitioner(list);
 

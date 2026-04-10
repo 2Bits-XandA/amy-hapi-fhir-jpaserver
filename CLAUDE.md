@@ -73,10 +73,13 @@ Single Maven module. Key packages under `ca.uhn.fhir.jpa.starter`:
 
 - **Authentication:** Keycloak + JWT/JWKS (`JwksValidator`, `JwtValidator`)
 - **Authorization:** `RoleBasedAuthorizationInterceptor` with patient-practitioner link types (owner, vet, other) and time-limited access
+- **Patient-Compartment:** Owner has full CRUD on all resources. Vet write access limited to `ALLOWED_RESOURCES` (see `RoleBasedAuthorizationInterceptor.java:34`):
+  Observation, MedicationRequest, MedicationAdministration, DocumentReference, Immunization, Condition, Encounter
 - **Patient linking:** `PatientCreateInterceptor` auto-links creator as owner
 - **Custom FHIR extensions:**
   - `http://amyvet.org/fhir/StructureDefinition/link-type`
   - `http://amyvet.org/fhir/StructureDefinition/period-extension`
+- **Custom CodeSystem:** `http://amyvet.org/fhir/CodeSystem/breed` (see `src/main/resources/codesystem-breed.json`)
 
 ## Configuration
 

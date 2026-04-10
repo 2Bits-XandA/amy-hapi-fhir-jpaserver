@@ -294,8 +294,7 @@ public class StarterJpaConfig {
 			Optional<IpsOperationProvider> theIpsOperationProvider,
 			Optional<IImplementationGuideOperationProvider> implementationGuideOperationProvider,
 			DiffProvider diffProvider,
-			RoleBasedAuthorizationInterceptor roleBasedAuthorizationInterceptor
-			) {
+			RoleBasedAuthorizationInterceptor roleBasedAuthorizationInterceptor) {
 		RestfulServer fhirServer = new RestfulServer(fhirSystemDao.getContext());
 
 		List<String> supportedResourceTypes = appProperties.getSupported_resource_types();

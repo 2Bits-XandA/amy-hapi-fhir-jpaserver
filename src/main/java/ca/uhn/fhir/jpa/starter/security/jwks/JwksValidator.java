@@ -32,8 +32,8 @@ public class JwksValidator implements JwtValidator {
 		HttpsJwks httpsJkws = new HttpsJwks(jwksConfig.getJwksUrl());
 		HttpsJwksVerificationKeyResolver httpsJwksKeyResolver = new HttpsJwksVerificationKeyResolver(httpsJkws);
 		JwtConsumerBuilder builder = new JwtConsumerBuilder()
-			.setExpectedIssuer(jwksConfig.getIssuerUrl())
-			.setVerificationKeyResolver(httpsJwksKeyResolver);
+				.setExpectedIssuer(jwksConfig.getIssuerUrl())
+				.setVerificationKeyResolver(httpsJwksKeyResolver);
 		if (jwksConfig.hasAudience()) {
 			builder.setExpectedAudience(jwksConfig.getAudience());
 		}
@@ -42,9 +42,10 @@ public class JwksValidator implements JwtValidator {
 	}
 
 	@Hook(Pointcut.SERVER_INCOMING_REQUEST_POST_PROCESSED)
-	public boolean incomingRequestPostProcessed(RequestDetails theRequestDetails, HttpServletRequest theRequest, HttpServletResponse theResponse) throws AuthenticationException {
+	public boolean incomingRequestPostProcessed(
+			RequestDetails theRequestDetails, HttpServletRequest theRequest, HttpServletResponse theResponse)
+			throws AuthenticationException {
 		String authHeader = theRequestDetails.getHeader("Authorization");
-
 
 		// The format of the header must be:
 		// Authorization: Bearer [jwt-Token]
@@ -70,5 +71,4 @@ public class JwksValidator implements JwtValidator {
 			throw new IOException("Could not Parse Payload", e);
 		}
 	}
-
 }

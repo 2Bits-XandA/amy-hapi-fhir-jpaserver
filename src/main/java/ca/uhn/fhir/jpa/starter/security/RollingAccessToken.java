@@ -6,7 +6,6 @@ import org.slf4j.LoggerFactory;
 import java.util.Timer;
 import java.util.TimerTask;
 
-
 public class RollingAccessToken {
 	private String currentToken = generateToken();
 	private String previousToken = generateToken();
@@ -14,14 +13,16 @@ public class RollingAccessToken {
 	private final Timer timer = new Timer(true);
 	private static final Logger logger = LoggerFactory.getLogger(RollingAccessToken.class);
 
-
 	public RollingAccessToken() {
-		timer.scheduleAtFixedRate(new TimerTask() {
-			@Override
-			public void run() {
-				changeToken();
-			}
-		}, 5 * 60 * 1000, 5 * 60 * 1000);
+		timer.scheduleAtFixedRate(
+				new TimerTask() {
+					@Override
+					public void run() {
+						changeToken();
+					}
+				},
+				5 * 60 * 1000,
+				5 * 60 * 1000);
 		changeToken();
 	}
 
