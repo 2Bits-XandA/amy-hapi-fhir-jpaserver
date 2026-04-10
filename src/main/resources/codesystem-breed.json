@@ -1,0 +1,283 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "amyvet-breed",
+  "url": "http://amyvet.org/fhir/CodeSystem/breed",
+  "version": "1.0.0",
+  "name": "AmyVetBreed",
+  "title": "AmyVet Animal Breed CodeSystem",
+  "status": "active",
+  "experimental": false,
+  "date": "2026-04-08",
+  "publisher": "AmyVet",
+  "description": "Breed codes for companion animals (dogs and cats). SNOMED CT International Edition does not include companion animal breeds; the licensed VetSCT extension (Virginia Tech) is required for standardized codes. This custom CodeSystem provides a practical alternative for the AmyVet veterinary platform.",
+  "caseSensitive": true,
+  "hierarchyMeaning": "grouped-by",
+  "content": "complete",
+  "count": 18,
+  "property": [
+    {
+      "code": "species",
+      "description": "The species this breed belongs to, as a SNOMED CT concept ID",
+      "type": "code"
+    },
+    {
+      "code": "displayDE",
+      "description": "German display name",
+      "type": "string"
+    }
+  ],
+  "concept": [
+    {
+      "code": "beagle",
+      "display": "Beagle",
+      "designation": [
+        {
+          "language": "de",
+          "value": "Beagle"
+        }
+      ],
+      "property": [
+        { "code": "species", "valueCode": "448771007" },
+        { "code": "displayDE", "valueString": "Beagle" }
+      ]
+    },
+    {
+      "code": "german-shepherd",
+      "display": "German Shepherd",
+      "designation": [
+        {
+          "language": "de",
+          "value": "Deutscher Schäferhund"
+        }
+      ],
+      "property": [
+        { "code": "species", "valueCode": "448771007" },
+        { "code": "displayDE", "valueString": "Deutscher Schäferhund" }
+      ]
+    },
+    {
+      "code": "labrador-retriever",
+      "display": "Labrador Retriever",
+      "designation": [
+        {
+          "language": "de",
+          "value": "Labrador Retriever"
+        }
+      ],
+      "property": [
+        { "code": "species", "valueCode": "448771007" },
+        { "code": "displayDE", "valueString": "Labrador Retriever" }
+      ]
+    },
+    {
+      "code": "golden-retriever",
+      "display": "Golden Retriever",
+      "designation": [
+        {
+          "language": "de",
+          "value": "Golden Retriever"
+        }
+      ],
+      "property": [
+        { "code": "species", "valueCode": "448771007" },
+        { "code": "displayDE", "valueString": "Golden Retriever" }
+      ]
+    },
+    {
+      "code": "french-bulldog",
+      "display": "French Bulldog",
+      "designation": [
+        {
+          "language": "de",
+          "value": "Französische Bulldogge"
+        }
+      ],
+      "property": [
+        { "code": "species", "valueCode": "448771007" },
+        { "code": "displayDE", "valueString": "Französische Bulldogge" }
+      ]
+    },
+    {
+      "code": "dachshund",
+      "display": "Dachshund",
+      "designation": [
+        {
+          "language": "de",
+          "value": "Dackel"
+        }
+      ],
+      "property": [
+        { "code": "species", "valueCode": "448771007" },
+        { "code": "displayDE", "valueString": "Dackel" }
+      ]
+    },
+    {
+      "code": "jack-russell-terrier",
+      "display": "Jack Russell Terrier",
+      "designation": [
+        {
+          "language": "de",
+          "value": "Jack Russell Terrier"
+        }
+      ],
+      "property": [
+        { "code": "species", "valueCode": "448771007" },
+        { "code": "displayDE", "valueString": "Jack Russell Terrier" }
+      ]
+    },
+    {
+      "code": "australian-shepherd",
+      "display": "Australian Shepherd",
+      "designation": [
+        {
+          "language": "de",
+          "value": "Australian Shepherd"
+        }
+      ],
+      "property": [
+        { "code": "species", "valueCode": "448771007" },
+        { "code": "displayDE", "valueString": "Australian Shepherd" }
+      ]
+    },
+    {
+      "code": "border-collie",
+      "display": "Border Collie",
+      "designation": [
+        {
+          "language": "de",
+          "value": "Border Collie"
+        }
+      ],
+      "property": [
+        { "code": "species", "valueCode": "448771007" },
+        { "code": "displayDE", "valueString": "Border Collie" }
+      ]
+    },
+    {
+      "code": "mixed-dog",
+      "display": "Mixed breed dog",
+      "designation": [
+        {
+          "language": "de",
+          "value": "Mischling"
+        }
+      ],
+      "property": [
+        { "code": "species", "valueCode": "448771007" },
+        { "code": "displayDE", "valueString": "Mischling" }
+      ]
+    },
+    {
+      "code": "european-shorthair",
+      "display": "European Shorthair",
+      "designation": [
+        {
+          "language": "de",
+          "value": "Europäisch Kurzhaar"
+        }
+      ],
+      "property": [
+        { "code": "species", "valueCode": "448169003" },
+        { "code": "displayDE", "valueString": "Europäisch Kurzhaar" }
+      ]
+    },
+    {
+      "code": "maine-coon",
+      "display": "Maine Coon",
+      "designation": [
+        {
+          "language": "de",
+          "value": "Maine Coon"
+        }
+      ],
+      "property": [
+        { "code": "species", "valueCode": "448169003" },
+        { "code": "displayDE", "valueString": "Maine Coon" }
+      ]
+    },
+    {
+      "code": "british-shorthair",
+      "display": "British Shorthair",
+      "designation": [
+        {
+          "language": "de",
+          "value": "Britisch Kurzhaar"
+        }
+      ],
+      "property": [
+        { "code": "species", "valueCode": "448169003" },
+        { "code": "displayDE", "valueString": "Britisch Kurzhaar" }
+      ]
+    },
+    {
+      "code": "persian",
+      "display": "Persian",
+      "designation": [
+        {
+          "language": "de",
+          "value": "Perserkatze"
+        }
+      ],
+      "property": [
+        { "code": "species", "valueCode": "448169003" },
+        { "code": "displayDE", "valueString": "Perserkatze" }
+      ]
+    },
+    {
+      "code": "siamese",
+      "display": "Siamese",
+      "designation": [
+        {
+          "language": "de",
+          "value": "Siamkatze"
+        }
+      ],
+      "property": [
+        { "code": "species", "valueCode": "448169003" },
+        { "code": "displayDE", "valueString": "Siamkatze" }
+      ]
+    },
+    {
+      "code": "ragdoll",
+      "display": "Ragdoll",
+      "designation": [
+        {
+          "language": "de",
+          "value": "Ragdoll"
+        }
+      ],
+      "property": [
+        { "code": "species", "valueCode": "448169003" },
+        { "code": "displayDE", "valueString": "Ragdoll" }
+      ]
+    },
+    {
+      "code": "bengal",
+      "display": "Bengal",
+      "designation": [
+        {
+          "language": "de",
+          "value": "Bengalkatze"
+        }
+      ],
+      "property": [
+        { "code": "species", "valueCode": "448169003" },
+        { "code": "displayDE", "valueString": "Bengalkatze" }
+      ]
+    },
+    {
+      "code": "mixed-cat",
+      "display": "Mixed breed cat",
+      "designation": [
+        {
+          "language": "de",
+          "value": "Mischling"
+        }
+      ],
+      "property": [
+        { "code": "species", "valueCode": "448169003" },
+        { "code": "displayDE", "valueString": "Mischling" }
+      ]
+    }
+  ]
+}

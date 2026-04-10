@@ -167,4 +167,10 @@ Temporary Items
 
 # Helm Chart dependencies
 **/charts/*.tgz
-.claude
+/keycloak/
+implementation-guide.md
+# Claude Code
+.claude/
+!.claude/settings.json
+!.claude/launch.json
+stack
