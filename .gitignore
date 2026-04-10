@@ -173,3 +173,4 @@ Temporary Items
 .claude/
 !.claude/settings.json
 !.claude/launch.json
+stack
