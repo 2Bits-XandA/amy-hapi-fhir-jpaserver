@@ -13,7 +13,7 @@
 - `mvn spring-boot:run -Pboot`: Start the server on port 8080 with hot reload-friendly Boot profile.
 - `mvn clean package spring-boot:repackage -Pboot && java -jar target/ROOT.war`: Build and exercise the bootable WAR.
 - `docker-compose up -d --build`: Launch JPAServer + PostgreSQL using the local Dockerfile.
-- `docker run -p 8080:8080 hapiproject/hapi:latest`: Compare against the upstream binary distribution.
+- `docker run -p 8080:8080 ghcr.io/2bits-xanda/amy-hapi-fhir-jpaserver:latest`: Run the published container image.
 
 ## Coding Style & Naming Conventions
 - Target Java 17, four-space indents, alphabetized imports, no wildcards.
