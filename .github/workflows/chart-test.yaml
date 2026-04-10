@@ -24,7 +24,7 @@ jobs:
 
       - name: Add workspace as safe directory
         run: |
-          git config --global --add safe.directory /__w/hapi-fhir-jpaserver-starter/hapi-fhir-jpaserver-starter
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Checkout
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
